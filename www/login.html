@@ -17,6 +17,17 @@
             display: flex;
             justify-content: center;
             align-items: center;
+            position: relative;
+        }
+
+        /* TOP-LEFT CORNER IMAGE */
+        .corner-image {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 180px;
+            height: auto;
+            border-bottom-right-radius: 12px;
         }
 
         .login-card {
@@ -95,6 +106,8 @@
 </head>
 
 <body>
+
+<img src="/static/images/bk.png" class="corner-image">
 
 <div class="login-card">
     <h2>Welcome Back</h2>

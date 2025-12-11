@@ -14,6 +14,68 @@
     --offline-color: #64748b;
 }
 
+/* ------------------------------------- */
+/* LIGHT MODE VARIABLES */
+/* ------------------------------------- */
+body.light-mode {
+    --bg-color: #f8fafc;
+    --sidebar-bg: #ffffff;
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --accent-color: #2563eb;
+    --accent-hover: #1e40af;
+    --message-sent: #3b82f6;
+    --message-received: #e2e8f0;
+    --border-color: #cbd5e1;
+    --success-color: #16a34a;
+    --offline-color: #94a3b8;
+}
+
+/* Light mode adjustments */
+body.light-mode .sidebar {
+    background-color: #ffffff;
+}
+
+body.light-mode .chat-area {
+    background-color: #f1f5f9;
+}
+
+body.light-mode .message.received {
+    color: #0f172a;
+}
+
+body.light-mode .message-input {
+    background-color: #ffffff;
+    color: #0f172a;
+}
+
+body.light-mode .input-area {
+    background-color: #ffffff;
+}
+
+/* Toggle Button */
+.theme-btn {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    padding: 8px 16px;
+    border-radius: 8px;
+    background: var(--accent-color);
+    color: white;
+    border: none;
+    cursor: pointer;
+    z-index: 999;
+    font-weight: 500;
+    transition: background 0.2s ease;
+}
+.theme-btn:hover {
+    background: var(--accent-hover);
+}
+
+/* ------------------------------------- */
+/* GENERAL BASE STYLES */
+/* ------------------------------------- */
+
 * {
     margin: 0;
     padding: 0;
@@ -37,12 +99,16 @@ body {
     height: 90vh;
     background: var(--sidebar-bg);
     border-radius: 16px;
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1),
+                0 10px 10px -5px rgba(0, 0, 0, 0.04);
     overflow: hidden;
     border: 1px solid var(--border-color);
 }
 
-/* Sidebar */
+/* ------------------------------------- */
+/* SIDEBAR */
+/* ------------------------------------- */
+
 .sidebar {
     width: 300px;
     background-color: rgba(30, 41, 59, 0.95);
@@ -166,7 +232,10 @@ body {
     color: var(--text-secondary);
 }
 
-/* Main Chat Area */
+/* ------------------------------------- */
+/* MAIN CHAT AREA */
+/* ------------------------------------- */
+
 .chat-area {
     flex: 1;
     display: flex;
@@ -293,7 +362,10 @@ body {
     stroke-linejoin: round;
 }
 
-/* Scrollbar */
+/* ------------------------------------- */
+/* SCROLLBAR */
+/* ------------------------------------- */
+
 ::-webkit-scrollbar {
     width: 6px;
 }
@@ -310,6 +382,10 @@ body {
 ::-webkit-scrollbar-thumb:hover {
     background: #475569;
 }
+
+/* ------------------------------------- */
+/* EMPTY STATE */
+/* ------------------------------------- */
 
 .empty-state {
     display: flex;

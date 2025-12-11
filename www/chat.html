@@ -7,20 +7,24 @@
     <link rel="stylesheet" href="css/chat.css">
 </head>
 <body>
+
+    <!-- Theme Toggle Button -->
+    <button id="themeToggle" class="theme-btn">🌙 Light Mode</button>
+
     <div class="app-container">
         <!-- Sidebar -->
         <aside class="sidebar">
             <div class="sidebar-header">
                 <h1 class="app-title">Chat</h1>
                 <button id="connectBtn" class="connect-btn">
-                    <span class="btn-text">Online</span>
+                    <span class="btn-text">ONLINE</span>
                     <span class="status-dot"></span>
                 </button>
             </div>
-            
+
             <div class="user-list-label">Online Users</div>
             <ul class="user-list" id="userList">
-                <!-- Users will be populated by JS -->
+                <!-- Users populated by JS -->
             </ul>
         </aside>
 
@@ -36,7 +40,7 @@
                 </header>
 
                 <div class="messages-container" id="messagesContainer">
-                    <!-- Messages will appear here -->
+                    <!-- Messages appear here -->
                 </div>
 
                 <div class="input-area">
@@ -59,27 +63,44 @@
     </div>
 
     <script>
-        // State
-        let users =     [];
+        /* ----------------------------
+           THEME TOGGLE
+        ---------------------------- */
+
+        const themeBtn = document.getElementById("themeToggle");
+        const body = document.body;
+
+        // Default DARK MODE
+        body.classList.add("dark-mode");
+
+        themeBtn.addEventListener("click", () => {
+            if (body.classList.contains("light-mode")) {
+                body.classList.remove("light-mode");
+                body.classList.add("dark-mode");
+                themeBtn.textContent = "🌙 Light Mode";
+            } else {
+                body.classList.remove("dark-mode");
+                body.classList.add("light-mode");
+                themeBtn.textContent = "☀ Dark Mode";
+            }
+        });
+
+        /* ----------------------------
+           APP LOGIC
+        ---------------------------- */
+
+        let users = [];
         let messages = {};
-        let currentmessages = [];
-        
         let currentUserId = null;
         let isConnected = false;
         let currentUserIP = null;
-        // API Calls
-        // API Calls
+
         async function getMessages() {
             try {
                 const res = await fetch('/api/get-messages');
-                // const data = await res.json();
-                // const data = await res.text();
-                data = await res.statusText
-                //console.log("Messages received:", data); // Debugging
-                return data; 
-            } catch (error) {
-                console.error('Error fetching messages:', error);
-                return {};
+                return await res.text();
+            } catch (err) {
+                return "{}";
             }
         }
 
@@ -87,20 +108,15 @@
             try {
                 const res = await fetch('/get-list');
                 const data = await res.json();
-                
-                
-                // The data structure is { peer_list: { "ip:port": { ... } } }
                 const peers = data.peer_list || {};
 
-                // Convert the peer_list object into an array for the UI
                 return Object.entries(peers).map(([key, u]) => ({
-                    id: key,              // Use "ip:port" as the unique ID
-                    name: key,            // Display "ip:port" as the name
-                    status: u.active ? 'online' : 'offline',
+                    id: key,
+                    name: key,
+                    status: u.active ? "online" : "offline",
                     avatarColor: getRandomColor()
                 }));
-            } catch (error) {
-                console.log('Error fetching users:', error);
+            } catch (err) {
                 return [];
             }
         }
@@ -115,16 +131,13 @@
             ];
             return colors[Math.floor(Math.random() * colors.length)];
         }
-        async function getCurrentIp(){
-    let res = await fetch("/userip", {
-        method: "GET"
-    });
 
-    let ip = res.statusText; 
-    //console.log("ip", typeof(ip));
-    return ip; 
-}
-        // DOM Elements
+        async function getCurrentIp() {
+            const res = await fetch("/userip");
+            return res.statusText;
+        }
+
+        // DOM
         const userListEl = document.getElementById('userList');
         const chatViewEl = document.getElementById('chatView');
         const emptyStateEl = document.getElementById('emptyState');
@@ -135,39 +148,34 @@
         const messageInputEl = document.getElementById('messageInput');
         const sendBtnEl = document.getElementById('sendBtn');
         const connectBtnEl = document.getElementById('connectBtn');
-        const currentPeerChatBox = document.getElementById('user-name')
-        
-        // Initialize
+
         async function init() {
             currentUserIP = await getCurrentIp();
             users = await getUsers();
-            currentmessages = await getMessages();
-            messages = await getMessages();
-            messages = JSON.parse(messages);
+
+            let rawMessages = await getMessages();
+            try { messages = JSON.parse(rawMessages); }
+            catch { messages = {}; }
+
             renderUserList();
             setupEventListeners();
-            renderMessages();
-
         }
 
         function renderUserList() {
-           
-            
-            userListEl.innerHTML = '';
+            userListEl.innerHTML = "";
 
             users.forEach(user => {
-                const li = document.createElement('li');
-                // console.log("current user id: ", currentUserIP)
-                // console.log("user id: ", user.id==currentUserIP)
-                // li.className = `user-item ${user.status === 'online' ? 'online' : 'offline'} ${currentUserIP === user.id ? 'active' : ''}`;
-                // li.onclick = () => selectUser(user.id); 
-                if (user.id !== currentUserIP) {
-                    li.className = `user-item ${user.status === 'online' ? 'online' : 'offline'} ${currentUserIP === user.id ? 'active' : ''}`
-                    li.onclick = () => selectUser(user.id);
-                    const initials = user.name.split(' ').map(n => n[0]).join('');
-                
+                if (user.id === currentUserIP) return;
+
+                const li = document.createElement("li");
+                li.className = `user-item ${user.status}`;
+
+                li.onclick = () => selectUser(user.id);
+
+                const initials = user.name.charAt(0).toUpperCase();
+
                 li.innerHTML = `
-                    <div class="user-avatar" style="background: ${user.avatarColor}">
+                    <div class="user-avatar" style="background:${user.avatarColor}">
                         ${initials}
                         <div class="status-indicator"></div>
                     </div>
@@ -176,251 +184,137 @@
                         <div class="user-status-text">${user.status}</div>
                     </div>
                 `;
-                userListEl.appendChild(li);
-                }else {     
 
-                    
-                }   
-               // console.log(user.id);
-                
+                userListEl.appendChild(li);
             });
         }
 
         function selectUser(id) {
-            if (!isConnected) {
-                //console.log(id)
-                alert('Please connect first!');
-                return;
-            }
-            //console.log(id)
+            if (!isConnected) return alert("Please connect first!");
 
             currentUserId = id;
             const user = users.find(u => u.id === id);
-            
-            // Update UI
-            emptyStateEl.style.display = 'none';
-            chatViewEl.style.display = 'flex';
-            
-            // Update Header
+
+            emptyStateEl.style.display = "none";
+            chatViewEl.style.display = "flex";
+
             headerNameEl.textContent = user.name;
-            headerStatusEl.textContent = user.status === 'online' ? 'Online' : 'Last seen recently';
-            const initials = user.name.split(' ').map(n => n[0]).join('');
+            headerStatusEl.textContent = user.status;
             headerAvatarEl.style.background = user.avatarColor;
-            headerAvatarEl.textContent = initials;
+            headerAvatarEl.textContent = user.name.charAt(0);
 
             renderMessages();
-            renderUserList(); // To update active state
-            
-            // Focus input
-            messageInputEl.focus();
         }
 
         function renderMessages() {
-            messagesContainerEl.innerHTML = '';
-            //message = getMessages();
-            messagesparsed = (messages);
-            // console.log("messages", messages)
-            // console.log("current type", typeof(messages))
-            //console.log("current userid", currentUserId)
-            
-            
-            //const mySentMessages = messagesparsed[currentUserId].filter(msg => msg.sender === currentUserIP)
-            // console.log("messagesparsed", messagesparsed)
-            // console.log("current userid", currentUserId)
-            // console.log("current user ip", currentUserIP)
-            // console.log("messagesparsed id", messagesparsed[currentUserId])
-            // console.log("messagesparsed ip", messagesparsed[currentUserIP])
-            if(messagesparsed[currentUserId] === undefined){
-                messagesparsed[currentUserId] = [];
-            }
-            if(messagesparsed[currentUserIP] === undefined){
-                messagesparsed[currentUserIP] = [];
-            }
-            const list1 = messagesparsed[currentUserId].filter(msg => msg.receiver === currentUserIP) || [];
-            const list2 = messagesparsed[currentUserIP].filter(msg => msg.receiver === currentUserId) || [];
-            const userMessages = [...list1, ...list2].sort((a, b) => a.id - b.id);
-            //console.log("user id", currentUserId)
-            //console.log("userMessages", userMessages)
-            
-            userMessages.forEach(msg => {
-                const msgDiv = document.createElement('div');
-                //console.log("msg", msg.sender)
-                msgDiv.className = `message ${msg.sender === currentUserIP ? 'sent' : 'received'}`;
-                msgDiv.innerHTML = `
+            messagesContainerEl.innerHTML = "";
+
+            const peerList = messages[currentUserId] || [];
+            const myList   = messages[currentUserIP] || [];
+
+            const all = [...peerList, ...myList].sort((a, b) => a.id - b.id);
+
+            all.forEach(msg => {
+                if (msg.sender !== currentUserId && msg.sender !== currentUserIP) return;
+
+                const div = document.createElement("div");
+                div.className = "message " + (msg.sender === currentUserIP ? "sent" : "received");
+                div.innerHTML = `
                     ${msg.text}
                     <div class="message-time">${msg.time}</div>
                 `;
-                messagesContainerEl.appendChild(msgDiv);
+                messagesContainerEl.appendChild(div);
             });
-            getMessages();
-            scrollToBottom();
-        }
 
-        function scrollToBottom() {
             messagesContainerEl.scrollTop = messagesContainerEl.scrollHeight;
         }
-        function online(){
-            // console.log(currentUserIP.split(":")[0])
-            // console.log(currentUserIP.split(":")[1])
-            fetch("/add-list",{
-                method:"POST",
-                headers:{
-                    "Content-Type":"application/json"
+
+        function sendMessagetoPeer(message) {
+            fetch("/send-message", {
+                method: "POST",
+                headers: {
+                    "Host": currentUserIP,
+                    "Receiver": currentUserId,
+                    "Content-Type": "application/json"
                 },
-                body:JSON.stringify({
-                    ip: currentUserIP.split(":")[0],
-                    port: currentUserIP.split(":")[1],
-                    active:true
-                })
-            })
+                body: JSON.stringify({ message })
+            });
         }
 
-        function sendMessagetoPeer(message){
-         fetch("/send-message",{
-            method:"POST",
-            headers:{
-                "Host":currentUserIP,
-                "Receiver":currentUserId,
-                "Content-Type":"application/json"
-                
-            },
-            body:JSON.stringify({
-                message: message,
-                
-            })
-         })   
-        }
         function sendMessage() {
             const text = messageInputEl.value.trim();
             if (!text || !currentUserId) return;
-            // console.log("currentUserId    ",currentUserId)
-            // console.log("currentUserIP    ",(currentUserIP))
-            // console.log("current message    ",messages)
-            // Add message
-            const newMsg = {    
+
+            const newMsg = {
                 id: Date.now(),
-                text: text,
+                text,
                 sender: currentUserIP,
-                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                receiver: currentUserId
+                receiver: currentUserId,
+                time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
             };
 
-            if (!messages[currentUserId]) {
-                messages[currentUserId] = [];
-                //console.log("debug 1 ")
-            }
+            if (!messages[currentUserId]) messages[currentUserId] = [];
             messages[currentUserId].push(newMsg);
 
-            // console.log(newMsg)
-            sendMessagetoPeer(newMsg)
-            messageInputEl.value = '';
+            sendMessagetoPeer(newMsg);
+            messageInputEl.value = "";
             renderMessages();
-            
-            // Simulate reply
-            setTimeout(() => {
-                // const replyMsg = {
-                //     id: Date.now() + 1,
-                //     text: "That's interesting! Tell me more.",
-                //     sender: 'them',
-                //     time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                // };
-                // messages[currentUserId].push(replyMsg);
-                renderMessages();
-            }, 500);
         }
-        function offline(){
-            fetch("/remove",{
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    ip: user.id.split(":")[0],
-                    port: user.id.split(":")[1],
-                    active: false
-                })
-            })
-        }
+
         function toggleConnect() {
             isConnected = !isConnected;
             const btnText = connectBtnEl.querySelector('.btn-text');
-            
+
             if (isConnected) {
-                connectBtnEl.classList.add('connected');
-                btnText.textContent = 'ONLINE';
-                ip_port_to_offline = 
-                // Simulate some users coming online
-                // online()
+                btnText.textContent = "ONLINE";
+                connectBtnEl.classList.add("connected");
+
                 fetch("/add-list", {
                     method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
+                    headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                         ip: currentUserIP.split(":")[0],
                         port: currentUserIP.split(":")[1],
                         active: true
                     })
-                })
-                renderUserList();
+                });
+
             } else {
-                connectBtnEl.classList.remove('connected');
-                btnText.textContent = 'OFFLINE';
-                currentUserId = null;
-                chatViewEl.style.display = 'none';
-                emptyStateEl.style.display = 'flex';
-                offline();
-                renderUserList();
+                btnText.textContent = "OFFLINE";
+                connectBtnEl.classList.remove("connected");
+
+                chatViewEl.style.display = "none";
+                emptyStateEl.style.display = "flex";
             }
+
+            renderUserList();
         }
 
         function setupEventListeners() {
-            connectBtnEl.addEventListener('click', toggleConnect);
-            
-            sendBtnEl.addEventListener('click', sendMessage);
-            
-            messageInputEl.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    sendMessage();
-                }
+            connectBtnEl.addEventListener("click", toggleConnect);
+            sendBtnEl.addEventListener("click", sendMessage);
+
+            messageInputEl.addEventListener("keypress", e => {
+                if (e.key === "Enter") sendMessage();
             });
         }
+
         setInterval(async () => {
             if (!isConnected) return;
 
-            // 1. Get new data
-            let rawData = await getMessages(); 
+            let raw = await getMessages();
+            try {
+                const parsed = JSON.parse(raw);
 
-            if (rawData) {
-                try {
-                    const parsedData = JSON.parse(rawData);
-                    
-                    // 2. CHECK: Has the active conversation changed?
-                    if (currentUserId) {
-                        const oldList = messages[currentUserId] || [];
-                        const newList = parsedData[currentUserId] || [];
-
-                        // Compare lengths. If same number of messages, STOP here.
-                        // This prevents the "annoying" refresh/scroll jump.
-                        if (oldList.length === newList.length) {
-                            return; 
-                        }
-                    }
-
-                    // 3. If we are here, it means we have NEW data. Update and Render.
-                    messages = parsedData; 
-                    if (currentUserId) {
-                        renderMessages();
-                        // Optional: Play a sound here!
-                    }
-
-                } catch (e) {
-                    // Ignore bad JSON
+                if (JSON.stringify(parsed) !== JSON.stringify(messages)) {
+                    messages = parsed;
+                    if (currentUserId) renderMessages();
                 }
-            }
+            } catch {}
         }, 2000);
-        // Run
+
         init();
     </script>
+
 </body>
 </html>
