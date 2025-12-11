@@ -126,7 +126,7 @@ class HttpAdapter:
                 resp.reason='OK'
                 resp.headers['Set-Cookie'] = 'auth=true; Path=/; HttpOnly'
             else:
-                print("111111111111111111111")
+                # print("111111111111111111111")
                 conn.sendall(resp.build_unauthorized())
                 conn.close()
                 return #401
@@ -140,7 +140,7 @@ class HttpAdapter:
                 if req.path == "/login":
                     req.path = "/login.html"
                 else:
-                    print("222222222222222")
+                    # print("222222222222222")
                     conn.sendall(resp.build_unauthorized())
                     conn.close()
                     return
@@ -151,22 +151,22 @@ class HttpAdapter:
         protected_tracker_API = ["/submit-info","/add-list", "/remove"]
 
         if req.path in protected_tracker_API:
-            print("req.path",req.path)
+            # print("req.path",req.path)
             auth = req.cookies.get("auth")
             
-            print("req.cookies",req.cookies)
-            print("auth",auth)
+            # print("req.cookies",req.cookies)
+            # print("auth",auth)
             if not auth:
                 # user is NOT authenticated 
                 req.hook = None
                 if req.path == "/login":
                     req.path = "/login.html"
                 else:
-                    print("3333333333333333")
+                    # print("3333333333333333")
                     conn.sendall(resp.build_unauthorized())
                     conn.close()
                     return
-            print("4444444444444444")
+            # print("4444444444444444")
         # Handle request hook
         if req.hook:
             print("[HttpAdapter] hook in route-path METHOD {} PATH {}".format(req.hook._route_path,req.hook._route_methods)) # o day bi nguoc ha ta?
