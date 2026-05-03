@@ -108,42 +108,49 @@ class HttpAdapter:
 
         #get req body
         body=req.body
+        
+        # Flag to track if this request just authenticated
+        just_authenticated = False
 
         #TASK 1A: Implement authentication handling
         if req.method == "POST" and req.path == "/login":
+            import urllib.parse
             params = {}
             for pair in body.split("&"):
                 if "=" in pair:
                     key, value = pair.split("=", 1)
-                    params[key] = value # for ex: username=long&password=123 become username: long, password: 123
+                    # URL decode the values
+                    params[urllib.parse.unquote_plus(key)] = urllib.parse.unquote_plus(value)
+            
+            print("[Auth] Login attempt with params:", params)
+            
             if params.get("username") == "admin" and params.get("password") == "password":
+                print("[Auth] Login successful!")
                 #auth_result = True
                 req.prepare_auth(True)
                 req.path = '/index.html'
+                just_authenticated = True
 
+                # Set cookie properly in resp.cookies (not headers)
                 resp.cookies['auth'] = 'true'
                 resp.status_code=200
                 resp.reason='OK'
-                resp.headers['Set-Cookie'] = 'auth=true; Path=/; HttpOnly'
             else:
-                # print("111111111111111111111")
+                print("[Auth] Login failed - invalid credentials")
+                print("[Auth] Expected: username=admin, password=password")
+                print("[Auth] Got: username={}, password={}".format(params.get("username"), params.get("password")))
                 conn.sendall(resp.build_unauthorized())
                 conn.close()
                 return #401
         #TASK 1B: Implement cookie-based authentication
         protected_paths = ["/","/login", "/index.html"]
 
-        if req.method == "GET" and req.path in protected_paths:
+        if not just_authenticated and req.method == "GET" and req.path in protected_paths:
             auth = req.cookies.get("auth")
             if not auth:
                 # user is NOT authenticated 
-                if req.path == "/login":
-                    req.path = "/login.html"
-                else:
-                    # print("222222222222222")
-                    conn.sendall(resp.build_unauthorized())
-                    conn.close()
-                    return
+                # Always redirect to login.html instead of returning 401
+                req.path = "/login.html"
             else:         
                 req.path = "/index.html"  
 
@@ -295,4 +302,4 @@ class HttpAdapter:
             headers["Proxy-Authorization"] = (username, password)
 
         return headers
-    
+

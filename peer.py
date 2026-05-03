@@ -297,30 +297,36 @@ def offline2(ip,port,pepo):
 
 
 def submit_info(ip,port,peer_ip,peer_port):
-  client_socket = socket.socket()
-  client_socket.connect((ip,port))
-  body_data = {
-    "ip": peer_ip,
-    "port": peer_port
-  }
-  body_json = json.dumps(body_data) # Converts to '{"ip": "127.0.0.1", "port": 8000}'
+  try:
+    print(f"[Peer] Registering with tracker {ip}:{port}...")
+    client_socket = socket.socket()
+    client_socket.connect((ip,port))
+    body_data = {
+      "ip": peer_ip,
+      "port": peer_port
+    }
+    body_json = json.dumps(body_data) # Converts to '{"ip": "127.0.0.1", "port": 8000}'
 
-# 2. Calculate length
-  content_length = len(body_json)
+  # 2. Calculate length
+    content_length = len(body_json)
 
-# 3. Construct the full message
-  request_message = (
-    "POST /submit-info HTTP/1.1\r\n"
-    "Host: localhost:9000\r\n"
-    "Content-Type: application/json\r\n"
-    "Cookie: auth=true\r\n"
-    f"Content-Length: {content_length}\r\n"
-    "\r\n"
-    f"{body_json}"
-  )
-  client_socket.send(request_message.encode())
-  receive_message =   client_socket.recv(1024).decode()
-  # print(receive_message)
+  # 3. Construct the full message
+    request_message = (
+      f"POST /submit-info HTTP/1.1\r\n"
+      f"Host: {ip}:{port}\r\n"
+      "Content-Type: application/json\r\n"
+      "Cookie: auth=true\r\n"
+      f"Content-Length: {content_length}\r\n"
+      "\r\n"
+      f"{body_json}"
+    )
+    client_socket.send(request_message.encode())
+    receive_message =   client_socket.recv(1024).decode()
+    print(f"[Peer] Registration successful!")
+    print(f"[Peer] Response: {receive_message[:100]}...")
+    client_socket.close()
+  except Exception as e:
+    print(f"[Peer] Registration failed: {e}")
 
 def listen_server(ip,port,peip,pepo): 
   listener = socket.socket()
@@ -332,25 +338,31 @@ def listen_server(ip,port,peip,pepo):
     nconn = threading.Thread(target= proc_message, args = (addr, conn))
     nconn.start()
 def add_list(ip, port, peer_ip,peer_port):
-  client_socket = socket.socket()
-  client_socket.connect((ip,port))
-  
-  body_data = {"ip": peer_ip, "port": peer_port}
-  body_json = json.dumps(body_data)
-  
-  msg = (
-      "POST /add-list HTTP/1.1\r\n"
-      "Host: localhost:9000\r\n"
-      "Content-Type: application/json\r\n"
-      "Cookie: auth=true\r\n"
-      f"Content-Length: {len(body_json)}\r\n"
-      "\r\n"
-      f"{body_json}"
-  )
-  
-  client_socket.send(msg.encode())  
-  receive_message = client_socket.recv(1024).decode()
-  # print(receive_message)
+  try:
+    print(f"[Peer] Going online to tracker {ip}:{port}...")
+    client_socket = socket.socket()
+    client_socket.connect((ip,port))
+    
+    body_data = {"ip": peer_ip, "port": peer_port}
+    body_json = json.dumps(body_data)
+    
+    msg = (
+        f"POST /add-list HTTP/1.1\r\n"
+        f"Host: {ip}:{port}\r\n"
+        "Content-Type: application/json\r\n"
+        "Cookie: auth=true\r\n"
+        f"Content-Length: {len(body_json)}\r\n"
+        "\r\n"
+        f"{body_json}"
+    )
+    
+    client_socket.send(msg.encode())  
+    receive_message = client_socket.recv(1024).decode()
+    print(f"[Peer] Now online!")
+    print(f"[Peer] Response: {receive_message[:100]}...")
+    client_socket.close()
+  except Exception as e:
+    print(f"[Peer] Go online failed: {e}")
 
 def get_list(ip,port):
   client_socket = socket.socket()

@@ -6,6 +6,10 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+
     <link rel="stylesheet" href="css/styles.css" />
 </head>
 
@@ -34,8 +38,10 @@
     <hr>
 
     <h2 class="section-title">Active Peer List</h2>
-    <button class="btn secondary full" onclick="getList()">Refresh Peer List</button>
-    <button onclick="chat()">Start Chatting</button>
+    <div class="button-row">
+        <button class="btn secondary" onclick="getList()">Refresh Peer List</button>
+        <button class="btn primary" onclick="chat()">Start Chatting</button>
+    </div>
     <div id="peerTable" class="table-container"></div>
 </div>
 
@@ -49,14 +55,18 @@ function chat() {
 function showPopup(msg, isError = false) {
     const popup = document.getElementById('popup');
     popup.textContent = msg;
-    popup.style.background = isError ? '#e53935' : '#4CAF50';
+    popup.style.background = isError ? 'var(--danger-color)' : 'var(--success-color)';
     popup.style.display = 'block';
-    setTimeout(() => popup.style.display = 'none', 1500);
+    setTimeout(() => popup.style.display = 'none', 2500);
 }
 
 async function submitInfo() {
     const ip = document.getElementById('ip').value;
     const port = document.getElementById('port').value;
+
+    if (!ip || !port) {
+        return showPopup('IP and Port are required.', true);
+    }
 
     const res = await fetch('/submit-info', {
         method: 'POST',
@@ -65,12 +75,16 @@ async function submitInfo() {
     });
     const data = await res.json();
     if (data.error) return showPopup(data.error, true);
-    showPopup(`${data.peer_id} registered`);
+    showPopup(`${data.peer_id} registered successfully!`);
 }
 
 async function addList() {
     const ip = document.getElementById('ip').value;
     const port = document.getElementById('port').value;
+
+    if (!ip || !port) {
+        return showPopup('IP and Port are required to go online.', true);
+    }
 
     const res = await fetch('/add-list', {
         method: 'POST',
@@ -79,12 +93,17 @@ async function addList() {
     });
     const data = await res.json();
     if (data.error) return showPopup(data.error, true);
-    showPopup(`${data.peer_id} is now online`);
+    showPopup(`${data.peer_id} is now online.`);
+    getList(); // Refresh list after going online
 }
 
 async function remove() {
     const ip = document.getElementById('ip').value;
     const port = document.getElementById('port').value;
+
+    if (!ip || !port) {
+        return showPopup('IP and Port are required to go offline.', true);
+    }
 
     const res = await fetch('/remove', {
         method: 'POST',
@@ -93,7 +112,8 @@ async function remove() {
     });
     const data = await res.json();
     if (data.error) return showPopup(data.error, true);
-    showPopup(`${data.peer_id} is now offline`);
+    showPopup(`${data.peer_id} is now offline.`);
+    getList(); // Refresh list after going offline
 }
 
 async function getList() {
@@ -102,25 +122,36 @@ async function getList() {
 
     let html = `
         <table>
-            <tr>
-                <th>IP Address</th>
-                <th>Port</th>
-            </tr>
+            <thead>
+                <tr>
+                    <th>IP Address</th>
+                    <th>Port</th>
+                </tr>
+            </thead>
+            <tbody>
     `;
 
-    for (const peerId in data.peer_list) {
-        const peer = data.peer_list[peerId];
-        html += `
-            <tr>
-                <td>${peer.ip}</td>
-                <td>${peer.port}</td>
-            </tr>
-        `;
+    const peerList = data.peer_list || {};
+    if (Object.keys(peerList).length === 0) {
+        html += `<tr><td colspan="2">No active peers found.</td></tr>`;
+    } else {
+        for (const peerId in peerList) {
+            const peer = peerList[peerId];
+            html += `
+                <tr>
+                    <td>${peer.ip}</td>
+                    <td>${peer.port}</td>
+                </tr>
+            `;
+        }
     }
 
-    html += '</table>';
+    html += '</tbody></table>';
     document.getElementById('peerTable').innerHTML = html;
 }
+
+// Initial load
+document.addEventListener('DOMContentLoaded', getList);
 </script>
 
 </body>
