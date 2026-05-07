@@ -102,12 +102,23 @@ def get_messages(headers, body):
       # print("body: ",body)
       # print("messagereceived: ",messagereceived)
       grouped = {}
+      me = "{}:{}".format(IP, PORT)
       for msg in messagereceived:
           sender = msg.get("sender")
-          if sender:
-            if sender not in grouped:
-                grouped[sender] = []
-            grouped[sender].append(msg)
+          receiver = msg.get("receiver")
+          if not sender:
+            continue
+
+          # Group by conversation peer so both sent and received messages
+          # appear in the same thread for the current user.
+          if sender == me and receiver:
+            peer_id = receiver
+          else:
+            peer_id = sender
+
+          if peer_id not in grouped:
+              grouped[peer_id] = []
+          grouped[peer_id].append(msg)
 
       return 200, json.dumps(grouped)
     except Exception as e:
@@ -155,8 +166,8 @@ def get_list(headers, body):
     if active_peers_dict is None:
         return 500, "Lỗi khi lấy danh sách Peer." # Lỗi server nội bộ
         
-    # 5. Nếu thành công, trả về mã 200 và Dữ liệu đã là Dictionary (framework sẽ tự động serialize thành JSON)
-    return  200,  active_peers_dict
+    # 5. Trả về JSON string hợp lệ để frontend parse được ổn định.
+    return  200,  json.dumps(active_peers_dict)
 
 @app.route("/userip", methods=["GET"])
 def get_user(headers, body):
@@ -192,15 +203,12 @@ def get_listfunc(ip, port):
         client_socket.close()
     # print("start: {}\n".format(receive_message))
 
-    lines = receive_message.split('\n', 1)
-    clean_response = lines[1] if len(lines) > 1 else ""
-    return clean_response
     # 2. Now receive_message is a string, so we can use string separators
     separator = '\r\n\r\n'
     
     if separator in receive_message:
         # 3. Split header and body
-        header_part, body_content_raw = receive_message.split(separator, 1)
+        _, body_content_raw = receive_message.split(separator, 1)
         
         # 4. Parse the body JSON string into a Python Dictionary
         try:

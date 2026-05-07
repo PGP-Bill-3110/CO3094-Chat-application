@@ -188,10 +188,30 @@ class HttpAdapter:
             else:
                 headers = msg
             print("[HttpAdapter] hook in route-path METHOD {} PATH {}".format(req.hook._route_path,req.hook._route_methods))
-            resp.status_code, resp.reason = req.hook(headers = headers,body = body)
+            status_code, hook_body = req.hook(headers = headers,body = body)
+            resp.status_code = status_code
             #
             # TODO: handle for App hook here
             #
+            reason_map = {
+                200: "OK",
+                201: "Created",
+                400: "Bad Request",
+                401: "Unauthorized",
+                403: "Forbidden",
+                404: "Not Found",
+                500: "Internal Server Error",
+            }
+            resp.reason = reason_map.get(status_code, "OK")
+
+            # For hook payloads other than "OK", respond directly as API JSON.
+            # This avoids relying on shared return.json across multiple processes.
+            if hook_body != "OK":
+                hook_body = self._normalize_hook_body_for_json(hook_body)
+                response = resp.build_api_response(status_code, hook_body)
+                conn.sendall(response)
+                conn.close()
+                return
 
         
         # Build response
@@ -201,7 +221,7 @@ class HttpAdapter:
         #print(response)
         conn.sendall(response)
         conn.close()
-
+    
     @property
     def extract_cookies(self, req, resp):
         """
@@ -302,4 +322,46 @@ class HttpAdapter:
             headers["Proxy-Authorization"] = (username, password)
 
         return headers
+
+    def _normalize_hook_body_for_json(self, hook_body):
+        """
+        Convert hook output to JSON-safe text without extra imports.
+        """
+        if hook_body is None:
+            return "\"\""
+
+        text = str(hook_body).strip()
+        if text == "":
+            return "\"\""
+
+        # Already JSON object/array/string/primitive -> keep as-is
+        if (
+            text.startswith("{") or
+            text.startswith("[") or
+            (text.startswith("\"") and text.endswith("\"")) or
+            text in ("true", "false", "null")
+        ):
+            return text
+
+        # numeric primitive
+        is_number = True
+        dot_count = 0
+        for idx, ch in enumerate(text):
+            if ch == "-" and idx == 0:
+                continue
+            if ch == ".":
+                dot_count += 1
+                if dot_count > 1:
+                    is_number = False
+                    break
+                continue
+            if not ch.isdigit():
+                is_number = False
+                break
+        if is_number:
+            return text
+
+        # fallback: encode as JSON string
+        escaped = text.replace("\\", "\\\\").replace("\"", "\\\"")
+        return "\"" + escaped + "\""
 

@@ -384,3 +384,33 @@ class Response():
             f"{body}"
             ).encode("utf-8")
 
+    def build_api_response(self, status_code, body_data):
+        """
+        Builds a simplified HTTP response for API calls.
+        """
+        self.status_code = status_code
+        
+        # Determine reason phrase from status code
+        reason_phrases = {200: "OK", 400: "Bad Request", 404: "Not Found", 500: "Internal Server Error"}
+        self.reason = reason_phrases.get(status_code, "OK")
+
+        # Ensure body is a string
+        if not isinstance(body_data, str):
+            body_data = str(body_data)
+            
+        self._content = body_data.encode('utf-8')
+
+        # Basic headers for an API response
+        headers = {
+            "Content-Type": "application/json; charset=utf-8",
+            "Content-Length": str(len(self._content)),
+            "Date": datetime.datetime.utcnow().strftime("%a, %d %b %Y %H:%M:%S GMT"),
+            "Connection": "close",
+            "Access-Control-Allow-Origin": "*" # Added for flexibility
+        }
+
+        status_line = f"HTTP/1.1 {self.status_code} {self.reason}\r\n"
+        header_lines = "".join(f"{k}: {v}\r\n" for k, v in headers.items())
+        
+        return (status_line + header_lines + "\r\n").encode('utf-8') + self._content
+

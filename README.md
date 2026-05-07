@@ -11,15 +11,21 @@ python start_tracker.py --server-ip 192.168.56.1 --server-port 9000
 python start_tracker.py --server-ip 10.123.176.214 --server-port 9000
 
 run peer
-make sure port 6000(the port of peer) is free
-python peer.py --server-ip 127.0.0.1 --server-port 9000 --peer-ip 127.0.0.1 --peer-port 6000
+use browser-safe ports for peers (avoid 6000 because Chrome blocks it)
+python peer.py --server-ip 127.0.0.1 --server-port 9000 --peer-ip 127.0.0.1 --peer-port 6001
+
+python peer.py --server-ip 127.0.0.1 --server-port 9000 --peer-ip 127.0.0.1 --peer-port 6002
+
+open chat pages:
+http://127.0.0.1:6001/chat.html
+http://127.0.0.1:6002/chat.html
 
 python peer.py --server-ip 192.168.56.1 --server-port 9000 --peer-ip 192.168.56.1 --peer-port 6002
 
 python peer.py --server-ip 192.168.56.1 --server-port 9000 --peer-ip 192.168.56.1 --peer-port 6003
 
 
-python peer.py --server-ip 10.123.176.215 --server-port 9000 --peer-ip 10.123.176.215 --peer-port 6000
+python peer.py --server-ip 10.123.176.215 --server-port 9000 --peer-ip 10.123.176.215 --peer-port 6001
 
 python peer.py --server-ip 10.123.176.216 --server-port 9000 --peer-ip 10.123.176.216 --peer-port 6002
 

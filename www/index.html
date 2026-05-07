@@ -50,7 +50,20 @@
 <script>
 
 function chat() {
-    window.location.href = 'chat.html';
+    const ip = document.getElementById('ip').value.trim();
+    const port = document.getElementById('port').value.trim();
+
+    if (!ip || !port) {
+        return showPopup('Please enter peer IP and port before chatting.', true);
+    }
+
+    // Chrome blocks some "unsafe" ports (e.g. 6000) at browser level.
+    const blockedPorts = new Set(['6000']);
+    if (blockedPorts.has(port)) {
+        return showPopup('Port 6000 is blocked by browser. Please use another peer port (e.g. 6001, 7000).', true);
+    }
+
+    window.location.href = `http://${ip}:${port}/chat.html`;
 }
 function showPopup(msg, isError = false) {
     const popup = document.getElementById('popup');
@@ -131,7 +144,7 @@ async function getList() {
             <tbody>
     `;
 
-    const peerList = data.peer_list || {};
+    const peerList = (data && data.peer_list) ? data.peer_list : (data || {});
     if (Object.keys(peerList).length === 0) {
         html += `<tr><td colspan="2">No active peers found.</td></tr>`;
     } else {
