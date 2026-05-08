@@ -55,6 +55,31 @@ server_port = 9000
 
 app = WeApRous()
 
+
+def _send_to_peer(target_peer_id, message_obj):
+    """Send one chat message object to a specific peer id (ip:port)."""
+    peerip, peerport = target_peer_id.split(":")
+    peerport = int(peerport)
+
+    body_json = json.dumps({"message": message_obj})
+    request_message = (
+        f"POST /receive-message HTTP/1.1\r\n"
+        f"Host: {peerip}:{peerport}\r\n"
+        f"Content-Type: application/json\r\n"
+        f"Cookie: auth=true\r\n"
+        f"Content-Length: {len(body_json)}\r\n"
+        f"\r\n"
+        f"{body_json}"
+    )
+
+    client_socket = socket.socket()
+    try:
+        client_socket.connect((peerip, peerport))
+        client_socket.send(request_message.encode())
+        client_socket.recv(4096)
+    finally:
+        client_socket.close()
+
 def setPort(pepo):
     global PORT
     PORT = pepo
@@ -129,33 +154,64 @@ def send_message(headers, body):
     try:
       # print("headers: ",headers)
       # print("body: ",body)
-      new_headers = headers.replace("/send-message", "/receive-message", 1)
-      # print("new_headers: ",new_headers)
-      
       body_json = json.loads(body)
       messageupdate = body_json['message']
       messagereceived.append(messageupdate)
-      peerip = body_json['message']['receiver'].split(":")[0]
-      peerport = int(body_json['message']['receiver'].split(":")[1])
-      
-      # print(f"Connecting to peer {peerip}:{peerport}...")
-      client_socket = socket.socket()
-      client_socket.connect((peerip, peerport))
-      
-      # Re-insert the CRLF separator between headers and body
-      full_message = new_headers + "\r\n\r\n" + body
-      client_socket.send(full_message.encode())
-      
-      # Wait for response to ensure delivery and check status
-      response = client_socket.recv(4096).decode()
-      # print(f"Response from peer {peerip}:{peerport}:\n{response}")
-      
-      client_socket.close()
+      peer_id = body_json['message']['receiver']
+      _send_to_peer(peer_id, messageupdate)
       
       return 200, "Message sent successfully"
     except Exception as e:
       print(f"Error in send_message: {e}")
       return 500, str(e)      
+
+
+@app.route("/broadcast-peer", methods=["POST"])
+@app.route("/broadcast-peer/", methods=["POST"])
+def broadcast_peer(headers, body):
+    """
+    Broadcast one message to every active peer (except myself).
+    API example: http://IP:port/broadcast-peer/
+    """
+    try:
+      body_json = json.loads(body) if body else {}
+      message = body_json.get("message", {})
+
+      if not isinstance(message, dict):
+        return 400, "Invalid message payload"
+
+      sender_id = "{}:{}".format(IP, PORT)
+      active_peers_dict = get_listfunc(server_ip, server_port)
+      if not active_peers_dict or "peer_list" not in active_peers_dict:
+        return 500, "Cannot fetch active peer list from tracker"
+
+      active_peer_ids = list(active_peers_dict["peer_list"].keys())
+      targets = [peer_id for peer_id in active_peer_ids if peer_id != sender_id]
+
+      delivered = []
+      failed = []
+
+      for peer_id in targets:
+        msg_copy = dict(message)
+        msg_copy["sender"] = sender_id
+        msg_copy["receiver"] = peer_id
+        msg_copy["is_broadcast"] = True
+        messagereceived.append(msg_copy)
+        try:
+          _send_to_peer(peer_id, msg_copy)
+          delivered.append(peer_id)
+        except Exception as err:
+          failed.append({"peer": peer_id, "error": str(err)})
+
+      return 200, json.dumps({
+        "mode": "broadcast",
+        "targets": len(targets),
+        "delivered": delivered,
+        "failed": failed,
+      })
+    except Exception as e:
+      print(f"Error in broadcast_peer: {e}")
+      return 500, str(e)
 
 @app.route("/get-list", methods=["GET"])
 def get_list(headers, body):

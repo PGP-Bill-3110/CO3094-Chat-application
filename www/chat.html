@@ -44,6 +44,9 @@
 
                 <div class="input-area">
                     <input type="text" id="messageInput" class="message-input" placeholder="Type a message...">
+                    <button id="broadcastBtn" class="send-btn broadcast-btn" title="Broadcast to all online peers">
+                        Broadcast
+                    </button>
                     <button id="sendBtn" class="send-btn">
                         <svg viewBox="0 0 24 24">
                             <line x1="22" y1="2" x2="11" y2="13"></line>
@@ -81,6 +84,7 @@
             headerAvatar: document.getElementById('headerAvatar'),
             messagesContainer: document.getElementById('messagesContainer'),
             messageInput: document.getElementById('messageInput'),
+            broadcastBtn: document.getElementById('broadcastBtn'),
             sendBtn: document.getElementById('sendBtn'),
             connectBtn: document.getElementById('connectBtn'),
         };
@@ -124,6 +128,9 @@
             },
             async sendMessage(message) {
                 return this.post("/send-message", { message });
+            },
+            async broadcastMessage(message) {
+                return this.post("/broadcast-peer/", { message });
             }
         };
         
@@ -267,6 +274,34 @@
             await api.sendMessage(newMsg);
         }
 
+        async function handleBroadcastMessage() {
+            if (!state.isConnected) {
+                alert('Please go online before broadcasting.');
+                return;
+            }
+
+            const text = dom.messageInput.value.trim();
+            if (!text) return;
+
+            const broadcastMsg = {
+                id: Date.now(),
+                text: text,
+                sender: state.currentUserIP,
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                receiver: 'broadcast',
+                is_broadcast: true
+            };
+
+            const result = await api.broadcastMessage(broadcastMsg);
+            if (result === null) {
+                alert('Broadcast failed. Please check your connection.');
+                return;
+            }
+
+            dom.messageInput.value = '';
+            pollData();
+        }
+
         async function toggleConnection() {
             state.isConnected = !state.isConnected;
             const btnText = dom.connectBtn.querySelector('.btn-text');
@@ -297,6 +332,7 @@
         function setupEventListeners() {
             dom.connectBtn.addEventListener('click', toggleConnection);
             dom.sendBtn.addEventListener('click', handleSendMessage);
+            dom.broadcastBtn.addEventListener('click', handleBroadcastMessage);
             dom.messageInput.addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') {
                     handleSendMessage();

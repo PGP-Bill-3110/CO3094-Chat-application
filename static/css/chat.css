@@ -1,17 +1,27 @@
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap');
 
 :root {
-    --bg-color: #111827;
-    --sidebar-bg: #1f2937;
-    --text-primary: #f9fafb;
-    --text-secondary: #9ca3af;
-    --accent-color: #3b82f6;
-    --accent-hover: #2563eb;
-    --message-sent: #3b82f6;
-    --message-received: #374151;
-    --border-color: #374151;
-    --success-color: #22c55e;
-    --offline-color: #6b7280;
+    /* "Midnight Teal" palette (đổi màu, giữ layout/chức năng) */
+    --bg-color: #071a2a;
+    --sidebar-bg: #0b2438;
+    --text-primary: #eaf6ff;
+    --text-secondary: #8fb2d9;
+
+    --accent-color: #14b8a6;
+    --accent-hover: #0d9488;
+    --accent-2: #8b5cf6;
+    --accent-rgb: 20, 184, 166;
+
+    --message-sent-1: #14b8a6;
+    --message-sent-2: #8b5cf6;
+    --message-received: #0f2a44;
+
+    --border-color: #16324f;
+    --success-color: #34d399;
+    --offline-color: #64748b;
+
+    --offline-dot: #fca5a5;
+    --online-dot: #6ee7b7;
 }
 
 * {
@@ -22,7 +32,10 @@
 
 body {
     font-family: 'Poppins', sans-serif;
-    background-color: var(--bg-color);
+    background:
+        radial-gradient(1200px circle at 10% 10%, rgba(var(--accent-rgb), 0.20), transparent 60%),
+        radial-gradient(1000px circle at 90% 30%, rgba(139, 92, 246, 0.18), transparent 55%),
+        var(--bg-color);
     color: var(--text-primary);
     height: 100vh;
     display: flex;
@@ -37,7 +50,7 @@ body {
     height: 95vh;
     background: var(--sidebar-bg);
     border-radius: 1rem;
-    box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+    box-shadow: 0 25px 70px -20px rgb(0 0 0 / 0.45);
     overflow: hidden;
     border: 1px solid var(--border-color);
 }
@@ -45,7 +58,7 @@ body {
 /* Sidebar */
 .sidebar {
     width: 320px;
-    background-color: #111827;
+    background-color: var(--bg-color);
     border-right: 1px solid var(--border-color);
     display: flex;
     flex-direction: column;
@@ -62,7 +75,8 @@ body {
 .app-title {
     font-size: 1.5rem;
     font-weight: 600;
-    background: linear-gradient(to right, #60a5fa, #a78bfa);
+    background: linear-gradient(to right, var(--accent-color), var(--accent-2));
+    background-clip: text;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
 }
@@ -97,12 +111,12 @@ body {
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background-color: #fee2e2;
+    background-color: var(--offline-dot);
     transition: background-color 0.3s;
 }
 
 .connect-btn.connected .status-dot {
-    background-color: #dcfce7;
+    background-color: var(--online-dot);
 }
 
 .user-list-label {
@@ -136,7 +150,7 @@ body {
 }
 
 .user-item.active {
-    background-color: rgba(59, 130, 246, 0.15);
+    background-color: rgba(var(--accent-rgb), 0.18);
 }
 
 .user-avatar {
@@ -200,7 +214,7 @@ body {
     border-bottom: 1px solid var(--border-color);
     display: flex;
     align-items: center;
-    background-color: rgba(31, 41, 55, 0.5);
+    background-color: rgba(11, 36, 56, 0.55);
     backdrop-filter: blur(10px);
     z-index: 10;
 }
@@ -242,7 +256,7 @@ body {
 
 .message.sent {
     align-self: flex-end;
-    background-color: var(--message-sent);
+    background: linear-gradient(135deg, var(--message-sent-1), var(--message-sent-2));
     color: white;
     border-bottom-right-radius: 0.25rem;
 }
@@ -285,7 +299,7 @@ body {
 
 .message-input:focus {
     border-color: var(--accent-color);
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+    box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.25);
 }
 
 .send-btn {
@@ -316,6 +330,14 @@ body {
     stroke-width: 2;
     stroke-linecap: round;
     stroke-linejoin: round;
+}
+
+.broadcast-btn {
+    width: auto;
+    border-radius: 9999px;
+    padding: 0 1rem;
+    font-weight: 600;
+    font-size: 0.85rem;
 }
 
 /* Scrollbar */
