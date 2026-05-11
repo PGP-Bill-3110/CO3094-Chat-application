@@ -19,9 +19,17 @@
                     <span class="btn-text">Go Online</span>
                     <span class="status-dot"></span>
                 </button>
+                <button id="joinChannelBtn" class="connect-btn" style="background-color: var(--accent-2); display: none; margin-top: 0.5rem;">
+                    Join Channel
+                </button>
             </div>
             
-            <div class="user-list-label">Online Peers</div>
+            <div class="user-list-label">Channels</div>
+            <ul class="user-list" id="channelList">
+                <!-- Channels will be populated by JS -->
+            </ul>
+
+            <div class="user-list-label">Direct Messages</div>
             <ul class="user-list" id="userList">
                 <!-- Users will be populated by JS -->
             </ul>
@@ -67,15 +75,24 @@
     <script>
         // --- STATE MANAGEMENT ---
         const state = {
-            users: [],
-            messages: {},
-            currentUserId: null,
+            // Connection & User Info
             currentUserIP: null,
             isConnected: false,
+            // Users for Direct Messages
+            users: [],
+            messages: {},
+            // Channels
+            joinedChannels: [],
+            channelMessages: {},
+            // Active Conversation
+            currentConversation: { id: null, type: null }, // type: 'user' or 'channel'
+            // For notifications
+            lastMessageCounts: {},
         };
 
         // --- DOM ELEMENTS ---
         const dom = {
+            channelList: document.getElementById('channelList'),
             userList: document.getElementById('userList'),
             chatView: document.getElementById('chatView'),
             emptyState: document.getElementById('emptyState'),
@@ -87,6 +104,7 @@
             broadcastBtn: document.getElementById('broadcastBtn'),
             sendBtn: document.getElementById('sendBtn'),
             connectBtn: document.getElementById('connectBtn'),
+            joinChannelBtn: document.getElementById('joinChannelBtn'),
         };
 
         // --- API CALLS ---
@@ -126,8 +144,22 @@
                     return null;
                 }
             },
-            async sendMessage(message) {
-                return this.post("/send-message", { message });
+            // User (DM) APIs
+            sendDirectMessage(message) {
+                return this.post("/send-peer/", { message });
+            },
+            connectPeer(peerId) {
+                return this.post("/connect-peer/", { peer_id: peerId });
+            },
+            // Channel APIs
+            getChannels() {
+                return this.get('/api/channels');
+            },
+            sendChannelMessage(message) {
+                return this.post('/send-channel-message', { message });
+            },
+            joinChannel(channelName) {
+                return this.post('/join-channel', { channel: channelName });
             },
             async broadcastMessage(message) {
                 return this.post("/broadcast-peer/", { message });
@@ -136,12 +168,13 @@
         
         // --- UI RENDERING ---
         function renderUserList() {
+            const { id: currentId, type } = state.currentConversation;
             dom.userList.innerHTML = '';
             state.users.forEach(user => {
                 if (user.id === state.currentUserIP) return;
 
                 const li = document.createElement('li');
-                li.className = `user-item ${user.status} ${state.currentUserId === user.id ? 'active' : ''}`;
+                li.className = `user-item ${user.status} ${type === 'user' && currentId === user.id ? 'active' : ''}`;
                 li.onclick = () => selectUser(user.id);
                 
                 const initials = user.name.substring(0, 2).toUpperCase();
@@ -160,20 +193,51 @@
             });
         }
 
+        function renderChannelList() {
+            const { id: currentId, type } = state.currentConversation;
+            dom.channelList.innerHTML = '';
+            state.joinedChannels.forEach(channelName => {
+                const li = document.createElement('li');
+                li.className = `channel-item ${type === 'channel' && currentId === channelName ? 'active' : ''}`;
+                li.onclick = () => selectChannel(channelName);
+
+                const messageCount = state.channelMessages[channelName]?.length || 0;
+                const lastCount = state.lastMessageCounts[channelName] || 0;
+                let badge = '';
+                if (type !== 'channel' || currentId !== channelName) {
+                    if (messageCount > lastCount) {
+                        badge = `<span class="unread-badge">${messageCount - lastCount}</span>`;
+                    }
+                }
+
+                li.innerHTML = `
+                    <div class="channel-icon">#</div>
+                    <div class="channel-name">${channelName}</div>
+                    ${badge}
+                `;
+                dom.channelList.appendChild(li);
+            });
+        }
+
         function renderMessages() {
             dom.messagesContainer.innerHTML = '';
-            if (!state.currentUserId || !state.messages[state.currentUserId]) {
-                return;
+            const { id, type } = state.currentConversation;
+            if (!id) return;
+
+            let messages = [];
+            if (type === 'user' && state.messages[id]) {
+                messages = state.messages[id].sort((a, b) => a.id - b.id);
+            } else if (type === 'channel' && state.channelMessages[id]) {
+                messages = state.channelMessages[id].sort((a, b) => a.timestamp - b.timestamp);
             }
 
-            const userMessages = state.messages[state.currentUserId].sort((a, b) => a.id - b.id);
-
-            userMessages.forEach(msg => {
+            messages.forEach(msg => {
                 const msgDiv = document.createElement('div');
-                msgDiv.className = `message ${msg.sender === state.currentUserIP ? 'sent' : 'received'}`;
+                const text = msg.text || msg.content; // Support both DM and channel message format
+                const time = msg.time || new Date(msg.timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                 msgDiv.innerHTML = `
-                    ${escapeHTML(msg.text)}
-                    <div class="message-time">${msg.time}</div>
+                    ${escapeHTML(text)}
+                    <div class="message-time">${time}</div>
                 `;
                 dom.messagesContainer.appendChild(msgDiv);
             });
@@ -181,11 +245,19 @@
         }
 
         function updateChatHeader(user) {
-            dom.headerName.textContent = user.name;
-            dom.headerStatus.textContent = user.status;
-            const initials = user.name.substring(0, 2).toUpperCase();
-            dom.headerAvatar.style.background = user.avatarColor;
-            dom.headerAvatar.textContent = initials;
+            const { id, type } = state.currentConversation;
+            if (type === 'channel') {
+                dom.headerName.textContent = `#${id}`;
+                dom.headerStatus.textContent = `${state.users.length} peers online`;
+                dom.headerAvatar.style.background = 'var(--accent-2)';
+                dom.headerAvatar.textContent = '#';
+            } else if (type === 'user') {
+                dom.headerName.textContent = user.name;
+                dom.headerStatus.textContent = user.status;
+                const initials = user.name.substring(0, 2).toUpperCase();
+                dom.headerAvatar.style.background = user.avatarColor;
+                dom.headerAvatar.textContent = initials;
+            }
         }
 
         function showChatView(show) {
@@ -204,6 +276,7 @@
         async function pollData() {
             if (!state.isConnected) return;
 
+            // Poll Users
             const usersData = await api.get('/get-list');
             if (usersData && usersData.peer_list) {
                 const peers = usersData.peer_list;
@@ -216,62 +289,103 @@
                 renderUserList();
             }
 
+            // Poll Direct Messages
             const messagesData = await api.get('/api/get-messages');
             if (messagesData) {
                 try {
                     const parsedMessages = typeof messagesData === 'string' ? JSON.parse(messagesData) : messagesData;
-                    
-                    // Simple check to see if messages have changed
                     if (JSON.stringify(state.messages) !== JSON.stringify(parsedMessages)) {
                         state.messages = parsedMessages;
-                        if (state.currentUserId) {
-                            renderMessages();
-                        }
+                        if (state.currentConversation.type === 'user') renderMessages();
                     }
                 } catch (e) {
                     // console.error("Could not parse messages:", e);
                 }
             }
+
+            // Poll Channels
+            const channelData = await api.getChannels();
+            if (channelData) {
+                const hasNewChannels = JSON.stringify(state.joinedChannels.sort()) !== JSON.stringify(channelData.joined.sort());
+                const hasNewMessages = JSON.stringify(state.channelMessages) !== JSON.stringify(channelData.messages);
+
+                if (hasNewChannels) {
+                    state.joinedChannels = channelData.joined;
+                }
+                if (hasNewMessages) {
+                    state.channelMessages = channelData.messages;
+                    if (state.currentConversation.type === 'channel') renderMessages();
+                }
+                // Always re-render channel list to update badges
+                renderChannelList();
+            }
         }
 
-        function selectUser(id) {
+        async function selectUser(id) {
             if (!state.isConnected) {
                 alert('Please go online to start chatting.');
                 return;
             }
-            state.currentUserId = id;
+            state.currentConversation = { id, type: 'user' };
+            await api.connectPeer(id);
             const user = state.users.find(u => u.id === id);
             if (user) {
                 updateChatHeader(user);
                 showChatView(true);
                 renderMessages();
-                renderUserList(); // To update active state
+                renderUserList();
+                renderChannelList();
                 dom.messageInput.focus();
             }
         }
 
+        function selectChannel(id) {
+            if (!state.isConnected) {
+                alert('Please go online to start chatting.');
+                return;
+            }
+            state.currentConversation = { id, type: 'channel' };
+            state.lastMessageCounts[id] = state.channelMessages[id]?.length || 0; // Mark as read
+            updateChatHeader();
+            showChatView(true);
+            renderMessages();
+            renderUserList();
+            renderChannelList();
+            dom.messageInput.focus();
+        }
+
         async function handleSendMessage() {
             const text = dom.messageInput.value.trim();
-            if (!text || !state.currentUserId) return;
+            const { id, type } = state.currentConversation;
+            if (!text || !id) return;
 
-            const newMsg = {
-                id: Date.now(),
-                text: text,
-                sender: state.currentUserIP,
-                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                receiver: state.currentUserId
-            };
+            if (type === 'user') {
+                const newMsg = {
+                    id: Date.now(),
+                    text: text,
+                    sender: state.currentUserIP,
+                    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    receiver: id
+                };
 
-            // Optimistically update UI
-            if (!state.messages[state.currentUserId]) {
-                state.messages[state.currentUserId] = [];
+                // Optimistically update UI
+                if (!state.messages[id]) state.messages[id] = [];
+                state.messages[id].push(newMsg);
+                renderMessages();
+                
+                await api.sendDirectMessage(newMsg);
+
+            } else if (type === 'channel') {
+                const newMsg = {
+                    channel: id,
+                    content: text
+                };
+                // No optimistic update for channels, let pollData handle it to ensure consistency
+                await api.sendChannelMessage(newMsg);
+                await pollData(); // Force a poll to see our own message
             }
-            state.messages[state.currentUserId].push(newMsg);
-            renderMessages();
-            dom.messageInput.value = '';
 
-            // Send to backend
-            await api.sendMessage(newMsg);
+             dom.messageInput.value = '';
         }
 
         async function handleBroadcastMessage() {
@@ -309,6 +423,7 @@
             if (state.isConnected) {
                 dom.connectBtn.classList.add('connected');
                 btnText.textContent = 'Online';
+                dom.joinChannelBtn.style.display = 'block';
                 await api.post('/add-list', { 
                     ip: state.currentUserIP.split(':')[0], 
                     port: state.currentUserIP.split(':')[1],
@@ -318,19 +433,31 @@
             } else {
                 dom.connectBtn.classList.remove('connected');
                 btnText.textContent = 'Go Online';
+                dom.joinChannelBtn.style.display = 'none';
                 await api.post('/remove', {
                     ip: state.currentUserIP.split(':')[0], 
                     port: state.currentUserIP.split(':')[1]
                 });
-                state.currentUserId = null;
+                state.currentConversation = { id: null, type: null };
                 showChatView(false);
                 state.users = [];
+                state.joinedChannels = [];
                 renderUserList();
+                renderChannelList();
+            }
+        }
+
+        async function handleJoinChannel() {
+            const channelName = prompt("Enter the name of the channel to join (e.g., 'dev-team'):");
+            if (channelName && channelName.trim()) {
+                const result = await api.joinChannel(channelName.trim());
+                if (result) pollData(); // Refresh channel list
             }
         }
 
         function setupEventListeners() {
             dom.connectBtn.addEventListener('click', toggleConnection);
+            dom.joinChannelBtn.addEventListener('click', handleJoinChannel);
             dom.sendBtn.addEventListener('click', handleSendMessage);
             dom.broadcastBtn.addEventListener('click', handleBroadcastMessage);
             dom.messageInput.addEventListener('keypress', (e) => {

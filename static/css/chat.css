@@ -200,6 +200,64 @@ body {
     color: var(--text-secondary);
 }
 
+/* Channel List Enhancements */
+.channel-item {
+    display: flex;
+    align-items: center;
+    padding: 0.85rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    margin-bottom: 0.25rem;
+}
+
+.channel-item:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.channel-item.active {
+    background-color: rgba(var(--accent-rgb), 0.18);
+}
+
+.channel-icon {
+    color: var(--accent-color);
+    margin-right: 0.75rem;
+    font-size: 1.2rem;
+    font-weight: bold;
+}
+
+.channel-name {
+    flex: 1;
+    font-weight: 500;
+    font-size: 0.9rem;
+}
+
+/* Notification Badge & Animations */
+.unread-badge {
+    background-color: var(--accent-2);
+    color: white;
+    font-size: 0.7rem;
+    font-weight: bold;
+    padding: 2px 6px;
+    border-radius: 10px;
+    animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.notification-pulse {
+    animation: pulse-ring 1.5s infinite;
+}
+
+@keyframes popIn {
+    0% { transform: scale(0); }
+    100% { transform: scale(1); }
+}
+
+@keyframes pulse-ring {
+    0% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.7); }
+    70% { box-shadow: 0 0 0 6px rgba(139, 92, 246, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0); }
+}
+
 /* Main Chat Area */
 .chat-area {
     flex: 1;

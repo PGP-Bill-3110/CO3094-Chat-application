@@ -29,6 +29,7 @@ Requirement:
 """
 import socket
 import threading
+import selectors
 from .response import *
 from .httpadapter import HttpAdapter
 from .dictionary import CaseInsensitiveDict
@@ -202,20 +203,24 @@ def run_proxy(ip, port, routes):
     try:
         proxy.bind((ip, port))
         proxy.listen(50)
+        proxy.setblocking(False)
         print("[Proxy] Listening on IP {} port {}".format(ip,port))
+        sel = selectors.DefaultSelector()
+        sel.register(proxy, selectors.EVENT_READ)
         while True:
-            conn, addr = proxy.accept()
-            #
-            #  TODO: implement the step of the client incomping connection
-            #        using multi-thread programming with the
-            #        provided handle_client routine
-            #
-            client_thread = threading.Thread(
-                target=handle_client,
-                args=(ip, port, conn, addr, routes)
-            )
-            client_thread.daemon = True  # Thread will die when main program exits
-            client_thread.start()
+            sel.select()
+            try:
+                while True:
+                    conn, addr = proxy.accept()
+                    conn.setblocking(True)
+                    client_thread = threading.Thread(
+                        target=handle_client,
+                        args=(ip, port, conn, addr, routes)
+                    )
+                    client_thread.daemon = True
+                    client_thread.start()
+            except BlockingIOError:
+                continue
     except socket.error as e:
       print("Socket error: {}".format(e))
 

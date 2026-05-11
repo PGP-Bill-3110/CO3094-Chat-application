@@ -43,6 +43,7 @@ Usage Example:
 import socket
 import threading
 import argparse
+import selectors
 
 from .response import *
 from .httpadapter import HttpAdapter
@@ -79,23 +80,28 @@ def run_backend(ip, port, routes):
     try:
         server.bind((ip, port))
         server.listen(50)
+        server.setblocking(False)
         print("[Backend] Listening on port {}".format(port))
         if routes != {}:
             print("[Backend] route settings {}".format(routes))
 
+        sel = selectors.DefaultSelector()
+        sel.register(server, selectors.EVENT_READ)
+
         while True:
-            conn, addr = server.accept()
-            #
-            #  TODO: implement the step of the client incomping connection
-            #        using multi-thread programming with the
-            #        provided handle_client routine
-            #
-            client_thread = threading.Thread(
-                target=handle_client,
-                args=(ip, port, conn, addr, routes)
-            )
-            client_thread.daemon = True  # Thread will die when main program exits
-            client_thread.start()
+            sel.select()
+            try:
+                while True:
+                    conn, addr = server.accept()
+                    conn.setblocking(True)
+                    client_thread = threading.Thread(
+                        target=handle_client,
+                        args=(ip, port, conn, addr, routes)
+                    )
+                    client_thread.daemon = True
+                    client_thread.start()
+            except BlockingIOError:
+                continue
     except socket.error as e:
       print("Socket error: {}".format(e))
 

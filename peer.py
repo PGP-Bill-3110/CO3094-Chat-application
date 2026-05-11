@@ -36,6 +36,10 @@ from daemon.weaprous import WeApRous
 messagereceived = [
 
 ]
+channels = {"general": []}  # Lưu trữ tin nhắn theo từng kênh (mặc định có kênh general)
+joined_channels = set(["general"])  # Danh sách các kênh mà peer này đã tham gia
+
+direct_peers = set()
 PORT = 5001  # Default port
 IP = "192.168.1.2"
 server_ip = "127.0.0.1"
@@ -80,6 +84,31 @@ def _send_to_peer(target_peer_id, message_obj):
     finally:
         client_socket.close()
 
+def _send_channel_msg_to_peer(target_peer_id, message_obj):
+    """Gửi tin nhắn kênh tới một peer khác (dùng cho cơ chế broadcast kênh)."""
+    peerip, peerport = target_peer_id.split(":")
+    peerport = int(peerport)
+
+    body_json = json.dumps({"message": message_obj})
+    request_message = (
+        f"POST /receive-channel-message HTTP/1.1\r\n"
+        f"Host: {peerip}:{peerport}\r\n"
+        f"Content-Type: application/json\r\n"
+        f"Cookie: auth=true\r\n"
+        f"Content-Length: {len(body_json)}\r\n"
+        f"\r\n"
+        f"{body_json}"
+    )
+    client_socket = socket.socket()
+    try:
+        client_socket.settimeout(2.0) # Tránh treo peer khi gửi tới peer offline
+        client_socket.connect((peerip, peerport))
+        client_socket.send(request_message.encode())
+    except Exception:
+        pass
+    finally:
+        client_socket.close()
+
 def setPort(pepo):
     global PORT
     PORT = pepo
@@ -110,12 +139,34 @@ def home(headers, body):
       return 200, html_content
     except Exception as e:
       return 500, str(e)
+
+@app.route("/receive-channel-message", methods=["POST"])
+def receive_channel_message(headers, body):
+    """Nhận tin nhắn của kênh từ một peer khác."""
+    try:
+        incoming = json.loads(body)["message"]
+        channel_name = incoming.get("channel")
+        
+        # Kiểm soát quyền truy cập: Chỉ nhận nếu đã tham gia kênh
+        if channel_name in joined_channels:
+            if channel_name not in channels:
+                channels[channel_name] = []
+            channels[channel_name].append(incoming)
+            
+        return 200, "Channel message received"
+    except Exception as e:
+        return 500, str(e)
+
 @app.route("/receive-message", methods=["POST"])
 def receive_message(headers, body):
     try:
       # print("new_headers received: ",headers)
       # print("message received: ",json.loads(body)["message"])
-      messagereceived.append(json.loads(body)["message"])
+      incoming = json.loads(body)["message"]
+      messagereceived.append(incoming)
+      sender_id = incoming.get("sender")
+      if sender_id:
+        direct_peers.add(sender_id)
       # print("messagereceived: ",messagereceived)
       return 200, "Message received successfullyfasdfa"
     except Exception as e:
@@ -149,28 +200,126 @@ def get_messages(headers, body):
     except Exception as e:
       return 500, str(e)
 
-@app.route("/send-message", methods=["POST"])
-def send_message(headers, body):
+@app.route("/api/channels", methods=["GET"])
+def get_channels(headers, body):
+    """Trả về danh sách các kênh đã tham gia và lịch sử tin nhắn."""
     try:
-      # print("headers: ",headers)
-      # print("body: ",body)
+        return 200, json.dumps({
+            "joined": list(joined_channels),
+            "messages": channels
+        })
+    except Exception as e:
+        return 500, str(e)
+
+@app.route("/join-channel", methods=["POST"])
+def join_channel(headers, body):
+    """Tham gia vào một kênh mới."""
+    try:
+        data = json.loads(body)
+        channel_name = data.get("channel")
+        if channel_name:
+            joined_channels.add(channel_name)
+            if channel_name not in channels:
+                channels[channel_name] = []
+            return 200, json.dumps({"status": "success", "channel": channel_name})
+        return 400, "Missing channel name"
+    except Exception as e:
+        return 500, str(e)
+
+@app.route("/send-channel-message", methods=["POST"])
+def send_channel_message(headers, body):
+    """Gửi tin nhắn vào kênh (Broadcast tới tất cả active peers)."""
+    try:
+        body_json = json.loads(body)
+        message = body_json.get("message", {})
+        channel_name = message.get("channel")
+
+        if not channel_name or channel_name not in joined_channels:
+            return 401, "Not joined in this channel"
+
+        sender_id = "{}:{}".format(IP, PORT)
+        message["sender"] = sender_id
+        message["timestamp"] = time.time()
+
+        # Lưu vào lịch sử local
+        channels[channel_name].append(message)
+
+        # Lấy danh sách peer từ tracker và broadcast
+        active_peers_dict = get_listfunc(server_ip, server_port)
+        if active_peers_dict and "peer_list" in active_peers_dict:
+            active_peer_ids = set(active_peers_dict["peer_list"].keys())
+            for peer_id in active_peer_ids:
+                if peer_id != sender_id:
+                    _send_channel_msg_to_peer(peer_id, message)
+
+        return 200, "Sent to channel successfully"
+    except Exception as e:
+        return 500, str(e)
+
+def _handle_send_peer(headers, body):
+    try:
       body_json = json.loads(body)
       messageupdate = body_json['message']
       messagereceived.append(messageupdate)
       peer_id = body_json['message']['receiver']
+      direct_peers.add(peer_id)
       _send_to_peer(peer_id, messageupdate)
-      
       return 200, "Message sent successfully"
     except Exception as e:
-      print(f"Error in send_message: {e}")
-      return 500, str(e)      
+      print(f"Error in send_peer: {e}")
+      return 500, str(e)
+
+
+@app.route("/send-message", methods=["POST"])
+def send_message(headers, body):
+    return _handle_send_peer(headers, body)
+
+
+@app.route("/send-peer", methods=["POST"])
+@app.route("/send-peer/", methods=["POST"])
+def send_peer(headers, body):
+    """Assignment API: http://IP:port/send-peer/ — same as /send-message."""
+    return _handle_send_peer(headers, body)
+
+
+@app.route("/connect-peer", methods=["POST"])
+@app.route("/connect-peer/", methods=["POST"])
+def connect_peer(headers, body):
+    """
+    Mark one peer as a direct connection of current peer.
+    Body can be {"peer_id":"ip:port"} or {"ip":"x.x.x.x", "port":1234}
+    """
+    try:
+      body_json = json.loads(body) if body else {}
+      peer_id = body_json.get("peer_id")
+      if not peer_id:
+        ip = body_json.get("ip")
+        port = body_json.get("port")
+        if ip and port:
+          peer_id = "{}:{}".format(ip, port)
+
+      if not peer_id or ":" not in str(peer_id):
+        return 400, "Invalid peer id"
+
+      my_id = "{}:{}".format(IP, PORT)
+      if peer_id == my_id:
+        return 400, "Cannot connect to self"
+
+      direct_peers.add(str(peer_id))
+      return 200, json.dumps({
+        "message": "Direct peer connected",
+        "peer_id": str(peer_id),
+      })
+    except Exception as e:
+      print(f"Error in connect_peer: {e}")
+      return 500, str(e)
 
 
 @app.route("/broadcast-peer", methods=["POST"])
 @app.route("/broadcast-peer/", methods=["POST"])
 def broadcast_peer(headers, body):
     """
-    Broadcast one message to every active peer (except myself).
+    Broadcast one message to all direct peers that are also active on the tracker.
     API example: http://IP:port/broadcast-peer/
     """
     try:
@@ -185,8 +334,15 @@ def broadcast_peer(headers, body):
       if not active_peers_dict or "peer_list" not in active_peers_dict:
         return 500, "Cannot fetch active peer list from tracker"
 
-      active_peer_ids = list(active_peers_dict["peer_list"].keys())
-      targets = [peer_id for peer_id in active_peer_ids if peer_id != sender_id]
+      active_peer_ids = set(active_peers_dict["peer_list"].keys())
+
+      # Keep only peers that are both direct-connected and currently active.
+      live_direct_peers = {
+        peer_id for peer_id in direct_peers
+        if peer_id in active_peer_ids and peer_id != sender_id
+      }
+      direct_peers.intersection_update(active_peer_ids)
+      targets = sorted(list(live_direct_peers))
 
       delivered = []
       failed = []
